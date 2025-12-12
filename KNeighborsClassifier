@@ -1,0 +1,124 @@
+import seaborn as sns
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+import matplotlib.pyplot as plt
+
+breast_cancer_data = load_breast_cancer()
+
+## Preview the data ##
+# print(breast_cancer_data.data[0])
+# print(breast_cancer_data.feature_names)
+
+# print(breast_cancer_data.target)
+# print(breast_cancer_data.target_names)
+## Split data ##
+training_data, validation_data, training_labels, validation_labels =  train_test_split(breast_cancer_data.data, breast_cancer_data.target, test_size=0.2, random_state=100)
+
+## Initiate classifier ## 
+classifier = KNeighborsClassifier(n_neighbors=3)
+classifier.fit(training_data, training_labels)
+
+## Checking accuracy of model
+print(f"Classifier's score: {classifier.score(validation_data, validation_labels)}")
+k_list = range(1,101)
+k_values = []
+for k in k_list:
+  classifier = KNeighborsClassifier(n_neighbors=k)
+  classifier.fit(training_data, training_labels)
+  k_values.append(classifier.score(validation_data, validation_labels))
+
+
+plt.plot(k_list, k_values)
+plt.xlabel('k')
+plt.ylabel('Validation Accuracy')
+plt.title('K Accuracy')
+plt.show()
+
+print(f'Optimal K to use: {k_values.index(max(k_values))}')
+# Exploratory
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+import seaborn as sns
+import pandas as pd
+
+# Convert to DataFrame for easier plotting
+df = pd.DataFrame(breast_cancer_data.data, columns=breast_cancer_data.feature_names)
+df["target"] = breast_cancer_data.target
+df["target_name"] = df["target"].map({0: "malignant", 1: "benign"})
+
+# PCA reduce to 2D
+pca = PCA(n_components=2)
+reduced = pca.fit_transform(df[breast_cancer_data.feature_names])
+df["PC1"] = reduced[:,0]
+df["PC2"] = reduced[:,1]
+
+# Plot with correct legend
+plt.figure(figsize=(8,6))
+sns.scatterplot(
+    data=df,
+    x="PC1",
+    y="PC2",
+    hue="target_name",        # use actual class names
+    palette={"malignant": "red", "benign": "blue"},
+    alpha=0.7
+)
+plt.title("Breast Cancer Data - PCA Visualization")
+plt.xlabel("PCA 1")
+plt.ylabel("PCA 2")
+plt.show()
+
+from sklearn.manifold import TSNE
+
+tsne = TSNE(n_components=2, perplexity=30, random_state=100)
+tsne_results = tsne.fit_transform(breast_cancer_data.data)
+
+plt.figure(figsize=(8,6))
+sns.scatterplot(
+    x=tsne_results[:,0],
+    y=tsne_results[:,1],
+    hue=breast_cancer_data.target,
+    palette=["red","blue"],
+    alpha=0.7
+)
+plt.title("Breast Cancer Data - t-SNE Visualization")
+plt.show()
+
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+
+cm = confusion_matrix(validation_labels, classifier.predict(validation_data))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                              display_labels=breast_cancer_data.target_names)
+disp.plot(cmap="Blues")
+plt.title("Confusion Matrix")
+plt.show()
+
+from sklearn.metrics import classification_report
+print(classification_report(validation_labels, classifier.predict(validation_data),
+                            target_names=breast_cancer_data.target_names))
+
+from sklearn.metrics import roc_curve, auc
+
+probs = classifier.predict_proba(validation_data)[:,1]
+fpr, tpr, _ = roc_curve(validation_labels, probs)
+roc_auc = auc(fpr, tpr)
+
+plt.plot(fpr, tpr, linewidth=2)
+plt.plot([0,1],[0,1],'--')
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title(f"ROC Curve (AUC = {roc_auc:.3f})")
+plt.show()
+
+## Feature importance evaluation
+from sklearn.inspection import permutation_importance
+
+r = permutation_importance(classifier, validation_data, validation_labels,
+                           n_repeats=10, random_state=0)
+
+sorted_idx = r.importances_mean.argsort()
+plt.barh(breast_cancer_data.feature_names[sorted_idx],
+         r.importances_mean[sorted_idx])
+plt.title("Permutation Feature Importance (KNN)")
+plt.show()
+
